@@ -13,7 +13,7 @@ CutMusic <- function(Music, from, to, normalize = FALSE){
   samp <- length(sound)
   rate <- Music@samp.rate
   time <- samp/rate 
-  if(from<0) return("CutMusic Error: from < 0")
+  if(from <= 0) return("CutMusic Error: from =< 0")
   if(to>time) return("CutMusic Error: to > length(Music)") 
   if(from>=to) return("CutMusic Error: from >= to")
   
@@ -27,7 +27,7 @@ CutMusic <- function(Music, from, to, normalize = FALSE){
 }
 
 
-#Wylicza tempo
+#Wylicza tempo (naiwne podejœcie. Nied³ugo spróbuje z lepszym filtrem)
 #Mono - obiekt klasy Wave, znormalizowany, mono
 Tempo <- function (Mono) {
   
@@ -61,13 +61,13 @@ Tempo <- function (Mono) {
   intStdVal = sd(interval, na.rm = TRUE)/2000
   intMedVal = median(interval, na.rm = TRUE)/2000
   
-#   plot(x, type="l")
-#   for (i in seq(1:length(m))){
-#       abline(v=m[i], col="red")
-#   }
-#   abline(h=meanVal+2*standDev, col="green")
-#   abline(h=meanVal-0.5*standDev, col="green")
-#   abline(h=meanVal, col="blue")
+  #   plot(x, type="l")
+  #   for (i in seq(1:length(m))){
+  #       abline(v=m[i], col="red")
+  #   }
+  #   abline(h=meanVal+2*standDev, col="green")
+  #   abline(h=meanVal-0.5*standDev, col="green")
+  #   abline(h=meanVal, col="blue")
   
   #Funckja zwraca mediane, œredni¹ i odchylenie standardowe interwa³ów
   result = c(intMedVal, intMeanVal, intStdVal)
@@ -75,7 +75,8 @@ Tempo <- function (Mono) {
   return(result)
 }
 
-#Wylicza tempo dla kwa³ków muzyki
+#Wylicza tempo dla kawa³ków muzyki. Zwraca data.frame z median¹, œredni¹ i odchyleniami standardowymi dla ka¿dego kawa³ka
+#Bazuje na funkcji Tempo (patrz: powy¿ej)
 #Music - obiekt klasy Wave, mono, znormalizowany
 #duration - czas trwania kawa³ków, domyœlnie 10s
 MusicTempo <- function (Music, duration=10) {
@@ -129,6 +130,9 @@ localMaxima <- function(x) {
   y
 }
 
+#Filtr pasmowo przepustowy dla podanej czêstotliwoœci Hz.
+#¯eby zobaczyæ, czy dzia³a, to nale¿y rysowaæ wykres (plot=TRUE)
+#W razie potrzeby mo¿na pokrêciæ parametrami Rp i Rs
 PassHz <- function (Hz, Rp=0.1, Rs=10, plot=FALSE) {
   Fs <- 44100
   chord2 <- cheb1ord(c((Hz-10)/(Fs/2), (Hz+10)/(Fs/2)), c((Hz-20)/(Fs/2), (Hz+20)/(Fs/2)), Rp, Rs)
@@ -142,6 +146,9 @@ PassHz <- function (Hz, Rp=0.1, Rs=10, plot=FALSE) {
   return(filter)
 }
 
+#Filtr pasmowo przepustowy dla czêstotliwoœci od 'from' do 'to' w Hz
+#¯eby zobaczyæ, czy dzia³a, to nale¿y rysowaæ wykres (plot=TRUE)
+#W razie potrzeby mo¿na pokrêciæ parametrami Rp i Rs
 BandPass <- function (from, to, Rp=0.1, Rs=1.3, plot=FALSE) {
   Fs <- 44100
   Wp = c((from-10)/(Fs/2), (to+10)/(Fs/2))
@@ -156,6 +163,9 @@ BandPass <- function (from, to, Rp=0.1, Rs=1.3, plot=FALSE) {
   return(filter)
 }
 
+#Liczy œredni¹ amplitutdê [dB] dla ca³ego pasma czêstotliwoœci oraz jej odchylenie standardowe
+#¯eby nie robiæ tego dla ca³ej piosenki, to mo¿na okreœliæ od której (from) do której (to) sekundy.
+#Mono - obiekt klasy wave, mono
 GetMeanAndStd <- function (Mono, from, to) {
   wav = CutMusic(Mono, from=from, to=to, normalize=TRUE)
   
@@ -164,20 +174,19 @@ GetMeanAndStd <- function (Mono, from, to) {
   window <- trunc(20*Fs/1000)          # 20 ms data window
   fftn <- 2^ceiling(log2(abs(window))) # next highest power of 2
   spg <- specgram(wav@left, fftn, Fs, hanning(fftn), window-step)
-  S <- abs(spg$S[2:(fftn*4000/Fs),])   # magnitude in range 0<f<=4000 Hz.
-  S <- S/max(S)         # normalize magnitude so that max is 0 dB.
-  S[S < 10^(-40/10)] <- 10^(-40/10)    # clip below -40 dB.
-  S[S > 10^(-3/10)] <- 10^(-3/10)      # clip above -3 dB.
   
-  v = rep(0, length(spg$f))
-  v = rowMeans(20*log10(Mod(spg$S)))
-  s = rowSds(20*log10(Mod(spg$S)))
+  avr = rep(0, length(spg$f))
+  avr = rowMeans(20*log10(Mod(spg$S)))
+  std = rowSds(20*log10(Mod(spg$S)))
   f = spg$f
-  d = data.frame(v,s,f)
+  #Zwraca data.frame z wektorem œrednich, odchyleñ i czêstotliwoœci
+  d = data.frame(avr,std,f)
   return(d)
   
 }
 
+#root mean square
+#Do porównywania dwóch wektorów
 RMS <- function (x, y) {
   return (sqrt(sum((x-y)^2)/length(x)))
 }
