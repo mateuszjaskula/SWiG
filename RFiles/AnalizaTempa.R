@@ -172,8 +172,12 @@ GetMeanAndStd <- function (Mono, from, to) {
   v = rep(0, length(spg$f))
   v = rowMeans(20*log10(Mod(spg$S)))
   s = rowSds(20*log10(Mod(spg$S)))
-  
-  d = data.frame(v,s)
+  f = spg$f
+  d = data.frame(v,s,f)
   return(d)
   
+}
+
+RMS <- function (x, y) {
+  return (sqrt(sum((x-y)^2)/length(x)))
 }
