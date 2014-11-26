@@ -1,4 +1,4 @@
-﻿#Tnie muzyke na kwałki
+#Tnie muzyke na kwałki
 #Music - obiekt klasy Wave
 #from - od której sekundy ciąć
 #to - do której sekundy ciąć
@@ -27,7 +27,7 @@ CutMusic <- function(Music, from, to, normalize = FALSE){
 }
 
 
-#Wylicza tempo (naiwne podejście)
+#Wylicza tempo
 #Mono - obiekt klasy Wave, znormalizowany, mono
 Tempo <- function (Mono) {
   
