@@ -1,0 +1,28 @@
+#Jak porównywaæ utwory wykorzystuj¹c MFCC
+#Wczytaj dwa utwory
+u1 = readMP3("u1.mp3")
+u2 = readMP3("u2.mp3")
+u1 = mono(u1,which="left")
+u2 = mono(u2,which="left")
+
+#Wytnij np po³owê utworu (ze œrodka)
+#MiddlePerc jest w Podstawowe funkcje.R
+#Pasowa³oby przetestowaæ czy zmiana d³ugoœci przetwarzanego sygna³u ma jakieœ wielkie znaczenie. Mo¿e wystarczy np 25% utworu
+u1 = MiddlePerc(u1, 50) #wycina 50% ze œrodka
+u2 = MiddlePerc(u2, 50) #wycina 50% ze œrodka
+
+#Wylicz MFCC 
+#Tutaj mo¿na potestowaæ jaka szerokoœæ okna bêdzie najlepsza i jaki wybraæ overlaping (ewentualnie jakieœ inne parametry funkcji melfcc)
+#Funckja MFCC jest w Podstawowe funkcje.R
+d1 = MFCC(u1)
+d2 = MFCC(u2)
+
+#Porównywanie wyników
+#RMS jest w Podstawowe funkcje.R
+wynik1 = RMS(d1$meanVal, d2$meanVal) #Porównanie œrednich
+wynik2 = RMS(d1$stdVal, d2$stdVal) #Porównanie odchyleñ
+wynik3 = RMS(d1$Delta_meanVal, d2$Delta_meanVal) #Porównanie œrednich delty
+wynik4 = RMS(d1$Delta_stdVal, d2$Delta_stdVal) #Porównanie odchyleñ delty
+
+#Suma wa¿ona wyników
+wynik = a*wynik1+b*wynik2+c*wynik3+d*wynik4

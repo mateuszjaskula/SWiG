@@ -13,12 +13,16 @@ CutMusic <- function(Music, from, to, normalize = FALSE){
   samp <- length(sound)
   rate <- Music@samp.rate
   time <- samp/rate 
-  if(from <= 0) return("CutMusic Error: from =< 0")
+  if(from < 0) return("CutMusic Error: from < 0")
   if(to>time) return("CutMusic Error: to > length(Music)") 
   if(from>=to) return("CutMusic Error: from >= to")
   
   leftIndex <- from*rate
   rightIndex <- to*rate 
+  #Je¿eli from==0, to zaczyna od pierwszego indeksu (w R pierwszy indeks to [1] a nie [0])
+  if(leftIndex==0){
+    leftIndex=1
+  }
   sound <- sound[seq(leftIndex, rightIndex, 1)]
   
   Music@left <- sound
@@ -34,7 +38,8 @@ Tempo <- function (Mono) {
   #Zmiana czêstotliwoœci próbkowania, ¿eby liczy³o siê szybciej
   Mono = downsample(Mono, 2000)
   #Wartoœæ bezwzglêdna
-  Mono@left = abs(Mono@left)
+  Mono@left = abs(Mono@left)        
+
   #6x filtr dolnoprzepustowy, ¿eby wyg³adziæ sygna³
   for (i in seq(1:6)){
     x = LPfilter(Mono@left, 10, 1/Mono@samp.rate)
@@ -61,13 +66,13 @@ Tempo <- function (Mono) {
   intStdVal = sd(interval, na.rm = TRUE)/2000
   intMedVal = median(interval, na.rm = TRUE)/2000
   
-  #   plot(x, type="l")
-  #   for (i in seq(1:length(m))){
-  #       abline(v=m[i], col="red")
-  #   }
-  #   abline(h=meanVal+2*standDev, col="green")
-  #   abline(h=meanVal-0.5*standDev, col="green")
-  #   abline(h=meanVal, col="blue")
+    plot(x, type="l")
+    for (i in seq(1:length(m))){
+        abline(v=m[i], col="red")
+    }
+    abline(h=meanVal+2*standDev, col="green")
+    abline(h=meanVal-0.5*standDev, col="green")
+    abline(h=meanVal, col="blue")
   
   #Funckja zwraca mediane, œredni¹ i odchylenie standardowe interwa³ów
   result = c(intMedVal, intMeanVal, intStdVal)
@@ -189,4 +194,156 @@ GetMeanAndStd <- function (Mono, from, to) {
 #Do porównywania dwóch wektorów
 RMS <- function (x, y) {
   return (sqrt(sum((x-y)^2)/length(x)))
+}
+
+#Zwraca œrodekowe 's' sekund utworu
+Middle <- function(Mono,s){
+  rate = Mono@samp.rate
+  samp = length(Mono@left)
+  
+  sound = Mono@left[seq(samp/2-s/2*rate, samp/2+s/2*rate,1)]
+  
+  result = Mono
+  result@left = sound
+  return(result)
+}
+
+#Zwraca œrodekowe 'p'%  utworu
+MiddlePerc <- function(Mono,p){
+  rate = Mono@samp.rate
+  samp = length(Mono@left)
+  
+  if(p>100) p = 100
+  if(p<0) p = 0
+  sound = Mono@left[seq(samp/2-p*samp/200,samp/2+p*samp/200,1)]
+  
+  result = Mono
+  result@left = sound
+  return(result)
+}
+
+#Jak w nazwie funkcji
+Hz2Mel <- function(Hz){
+  Mel = 1125*log(1+Hz/700)
+  return(Mel)
+}
+
+#Jak w nazwie funkcji
+Mel2Hz <- function(Mel){
+  Hz = 700*(exp(Mel/1125)-1)
+  return(Hz)
+}
+
+#mel filterbank
+#http://practicalcryptography.com/miscellaneous/machine-learning/guide-mel-frequency-cepstral-coefficients-mfccs/
+TriangularWindowFilterbank <- function(f, M, n){
+  
+  H = f[length(f)]
+  t = seq(1,M+2,1)
+  a = (Hz2Mel(H)-Hz2Mel(0))/(M+1)
+  b = Hz2Mel(0)-a
+  y = a*t+b
+  freqs = Mel2Hz(y)
+  
+  y=rep(0,length(f))
+  
+  for (i in seq(1:length(f))){
+    
+    #if(f[i]<freqs[n]) y[i] = 0
+    #if(f[i]>freqs[n+2]) y[i] = 0
+    
+    if(f[i]>=freqs[n] & f[i]<freqs[n+1]) 
+      y[i]=(f[i]-freqs[n])/(freqs[n+1]-freqs[n])
+    
+    if(f[i]>=freqs[n+1] & f[i]<=freqs[n+2]) 
+      y[i]=(f[i]-freqs[n+2])/(freqs[n+1]-freqs[n+2])    
+    
+  }
+  return(y)
+}
+
+#Tak jak w:
+#http://practicalcryptography.com/miscellaneous/machine-learning/guide-mel-frequency-cepstral-coefficients-mfccs/
+#Funkcja liczy wspó³czynniki MFFC dla podanego obiektu wave
+#wlen - d³ugoœæ ramki w ms
+#ovlen - overlaping [ms]
+#M - iloœæ filtrów w "mel filterbank"
+#Funkcja zwraca macierz v. W wierszach s¹ kolejne wspó³czynniki MFCC dla ka¿dej z ramek
+#Potrzebne paczki:
+# - dtt
+# - signal 
+# Lepiej u¿yæ funkcji MFCC, która jest poni¿ej. Ta nie jest zoptymalizowana i d³ugo siê liczy
+myMFCC <- function(wave, wlen=20, ovlap=20, M=26){
+  
+  #Tworzenie periodogramu
+  Fs <- wave@samp.rate
+  step <- trunc(ovlap*Fs/1000)         # one spectral slice every 20 ms
+  window <- trunc(wlen*Fs/1000)        # 20 ms data window
+  fftn <- 2^ceiling(log2(abs(window))) # next highest power of 2
+  spg <- specgram(wave@left, fftn, Fs, hanning(fftn), window-step)
+  #ilosc ramek: length(spg$t)
+  #czas trwania ramki: fftn/Fs
+  #i-ta ramka: spg$S[,i]
+  #czas rozpoczêcia i-tej ramki: spg$t[i]
+  
+  #Liczenie wspó³czynników MFCC dla ka¿dej ramki
+  c = matrix(0,length(spg$t),M)
+  v = matrix(0,length(spg$t),13)
+  for(i in seq(1,length(spg$t))){
+    P = 1/fftn*(Mod(spg$S[,i]))^2 #Moc w ramce
+    
+    for (j in seq(1,M)){
+      Pc = P*TriangularWindowFilterbank(spg$f, M, j)
+      c[i,j] = log10(sum(Pc))
+    }
+    #Liczenie DCT
+    c[i,] = dct(c[i,])
+    #Zwraca wspó³czynniki od 1 do 13. Reszte ignoruje
+    v[i,] = c[i,][seq(1,13,1)]
+  }
+  
+  return(v)
+}
+
+#Wylicza MFCC korzystaj¹c z funkcji melfcc z bibliteki tuneR
+#Dodatkowo wylicza delte, czyli "differential coefficients" 
+#(http://www.cs.cmu.edu/~robust/Papers/KumarKimSternICA11.pdf - równanie (1))
+#Music - obiekt klasy wave
+#wintime - szerokoœæ okna w sekundach
+#hoptime - co jaki okres czasu maj¹ zaczynaæ siê nowe ramki (odpowiada za overlaping)
+#numcep - ile wspó³czynników MFCC ma zwróciæ
+#Funkcja zwraca data.frame w postaci:
+# nr_wspó³czynnika     œrednia    odchylenie    œrednia delty    odchylenie delty
+#Wymagane paczki:
+# - tuneR
+# - matrixStats
+MFCC <- function(Music, wintime = 0.02, hoptime = 0.01, numcep=13){
+  
+  #Licz MFCC
+  m <- melfcc(Music, wintime = wintime, hoptime = hoptime, numcep=numcep, usecmp=FALSE,
+              modelorder=NULL, spec_out=FALSE, frames_in_rows=FALSE,
+              sumpower = TRUE, preemph=0, nbands=26, bwidth=1, dcttype="t2",
+              lifterexp = 0.6)
+  #Œrednia dla ka¿dego ze wspó³czynników ze wszystkich ramek
+  meanVal = rowMeans(m)
+  #ochylenie dla ka¿dego ze wspó³czynników ze wszystkich ramek
+  stdVal = rowSds(m)
+  #Mediana raczej nie bêdzie potrzebna
+  #medVal = rowMedians(m)
+  
+  #Licz delty
+  #http://www.cs.cmu.edu/~robust/Papers/KumarKimSternICA11.pdf - równanie (1)
+  #dla m = 2
+  delta = matrix(0, length(m[1,])-4, length(m[,1]))
+  for(i in seq(3, length(m[1,])-2, 1)){
+    delta[i-2,] = m[,i+2]-m[,i-2]  
+  }
+  
+  #Œrednia i ochylenie dla delt 
+  Delta_meanVal = colMeans(delta)
+  Delta_stdVal = colSds(delta)
+  #Delta_medVal = colMedians(delta)
+  
+  d = data.frame(meanVal, stdVal, Delta_meanVal, Delta_stdVal)
+  return(d)
 }
