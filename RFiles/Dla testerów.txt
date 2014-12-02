@@ -26,3 +26,16 @@ wynik4 = RMS(d1$Delta_stdVal, d2$Delta_stdVal) #Porównanie odchyleñ delty
 
 #Suma wa¿ona wyników
 wynik = a*wynik1+b*wynik2+c*wynik3+d*wynik4
+
+Update:
+MFCC zwraca równie¿ macierz kowariancji wspó³czynników + œrednie wspó³czynniki delta (coœ w rodzaju przyrostów MFCC) i ich macierz kowariancji. Do porównywania jest funkcja KLD (http://en.wikipedia.org/wiki/Kullback%E2%80%93Leibler_divergence). Idea jest taka, ¿e wszystkie wspó³czynniki traktuje siê jako n-wymiarowy (n=13) rozk³ad normalny. KLD na razie porównuje na zasadzie normalnych wspó³czynników, ale mo¿na te¿ sprawdziæ dla tych œmiesznych delt :D
+Trzebaby zamieniæ (w KLD):
+  mi0 = d0$meanVal
+  mi1 = d1$meanVal
+  Sigma0 = d0$Sigma
+  Sigma1 = d1$Sigma
+na:
+  mi0 = d0$Delta_meanVal
+  mi1 = d1$Delta_meanVal
+  Sigma0 = d0$Delta_Sigma
+  Sigma1 = d1$Delta_Sigma

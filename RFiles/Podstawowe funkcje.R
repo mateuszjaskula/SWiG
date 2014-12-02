@@ -171,7 +171,7 @@ BandPass <- function (from, to, Rp=0.1, Rs=1.3, plot=FALSE) {
 #Liczy œredni¹ amplitutdê [dB] dla ca³ego pasma czêstotliwoœci oraz jej odchylenie standardowe
 #¯eby nie robiæ tego dla ca³ej piosenki, to mo¿na okreœliæ od której (from) do której (to) sekundy.
 #Mono - obiekt klasy wave, mono
-GetMeanAndStd <- function (Mono, from, to) {
+GetMeanAndStd <- function (Mono, from=0, to=length(Mono@left)/Mono@samp.rate) {
   wav = CutMusic(Mono, from=from, to=to, normalize=TRUE)
   
   Fs <- wav@samp.rate
@@ -312,8 +312,12 @@ myMFCC <- function(wave, wlen=20, ovlap=20, M=26){
 #wintime - szerokoœæ okna w sekundach
 #hoptime - co jaki okres czasu maj¹ zaczynaæ siê nowe ramki (odpowiada za overlaping)
 #numcep - ile wspó³czynników MFCC ma zwróciæ
-#Funkcja zwraca data.frame w postaci:
-# nr_wspó³czynnika     œrednia    odchylenie    œrednia delty    odchylenie delty
+#Funkcja zwraca liste:
+# meanVal - wartoœæ œrednia wspó³czynników
+# stdVal - odchylenie standardowe wspó³czynników
+# Delta_meanVal - wartoœæ œrednia delty
+# Delta_stdVal - wartoœæ oczekiwana delty
+# Sigma - estymator macierzy kowariancji dla n-wymiarowego rozk³adu normalnego
 #Wymagane paczki:
 # - tuneR
 # - matrixStats
@@ -331,6 +335,15 @@ MFCC <- function(Music, wintime = 0.02, hoptime = 0.01, numcep=13){
   #Mediana raczej nie bêdzie potrzebna
   #medVal = rowMedians(m)
   
+  #Obliczanie macierzy kowariancji 
+  #(estymator o najwiêkszej wiarygodnoœci dla n-wymiarowego rozk³adu normalnego)
+  #http://pl.wikipedia.org/wiki/Wielowymiarowy_rozk%C5%82ad_normalny
+  Sigma = matrix(0,numcep,numcep)
+  for(i in seq(1, length(m[1,]))){
+    Sigma = Sigma + (m[,i]-meanVal)%*%t(m[,i]-meanVal)
+  }
+  Sigma = 1/length(m[1,])*Sigma
+  
   #Licz delty
   #http://www.cs.cmu.edu/~robust/Papers/KumarKimSternICA11.pdf - równanie (1)
   #dla m = 2
@@ -344,6 +357,60 @@ MFCC <- function(Music, wintime = 0.02, hoptime = 0.01, numcep=13){
   Delta_stdVal = colSds(delta)
   #Delta_medVal = colMedians(delta)
   
-  d = data.frame(meanVal, stdVal, Delta_meanVal, Delta_stdVal)
+  #Macierz kowariancji delt
+  Delta_Sigma = matrix(0,numcep,numcep)
+  for(i in seq(1, length(delta[,1]))){
+    Delta_Sigma = Delta_Sigma + (delta[i,]-Delta_meanVal)%*%t(delta[i,]-Delta_meanVal)
+  }
+  Delta_Sigma = 1/length(delta[,1])*Delta_Sigma
+  
+  d = list(meanVal=meanVal, 
+           stdVal=stdVal, 
+           Delta_meanVal=Delta_meanVal, 
+           Delta_stdVal=Delta_stdVal, 
+           Sigma=Sigma, 
+           Delta_Sigma = Delta_Sigma)
   return(d)
+}
+
+#Œlad macierzy
+tr <- function(A){
+  return(ifelse(isSquare(A), sum(diag(A)) ,NA))
+}
+
+#Czy macierz jest kwadratowa
+isSquare <- function(A){
+  return(is.matrix(A) && (nrow(A)==ncol(A)))
+}
+
+#Kullback-Leible Divergence
+#S³u¿y do porównywania dwóch rozk³adów normlanych Gaussa. N-wymiarowcyh
+KullbackLeibleDivergence <- function(mi0, mi1, Sigma0, Sigma1){
+  
+  D = log(det(Sigma0)/det(Sigma1))
+      +tr(ginv(Sigma0)%*%Sigma1)
+      +t(mi1-mi0)%*%ginv(Sigma0)%*%(mi1-mi0)
+      -nrow(Sigma0)
+#   D = -log(det(Sigma0)/det(Sigma1))
+#   +tr(ginv(Sigma1)%*%Sigma0)
+#   +t(mi1-mi0)%*%ginv(Sigma1)%*%(mi1-mi0)
+#   -nrow(Sigma0)
+#   D = 1/2*D
+  return(D)
+}
+
+# d0 i d1 to wyniki funkcji MFCC dla ró¿nych utworów
+#KLD nie jest symetryczne, dlatego trzeba zrobic tak:
+KLD <- function(d0,d1){
+  
+  mi0 = d0$meanVal
+  mi1 = d1$meanVal
+  Sigma0 = d0$Sigma
+  Sigma1 = d1$Sigma
+  
+  D = KullbackLeibleDivergence(mi0, mi1, Sigma0, Sigma1)
+     +KullbackLeibleDivergence(mi1, mi0, Sigma1, Sigma0)
+  
+  return(D)
+  #return(abs(floor(100*D)/100))
 }
