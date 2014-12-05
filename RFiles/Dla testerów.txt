@@ -1,4 +1,4 @@
-#Jak porównywaæ utwory wykorzystuj¹c MFCC
+
 #Wczytaj dwa utwory
 u1 = readMP3("u1.mp3")
 u2 = readMP3("u2.mp3")
@@ -11,11 +11,23 @@ u2 = mono(u2,which="left")
 u1 = MiddlePerc(u1, 50) #wycina 50% ze œrodka
 u2 = MiddlePerc(u2, 50) #wycina 50% ze œrodka
 
+#Albo 2 minity ze œrodka
+u1 = Middle(u1, 120) #wycina 120s ze œrodka
+u2 = Middle(u2, 120) #wycina 120s ze œrodka
+
+#normalizowanie
+u1@left = u1@left/2^(u1@bit-1)
+u2@left = u2@left/2^(u2@bit-1)
+
 #Wylicz MFCC 
 #Tutaj mo¿na potestowaæ jaka szerokoœæ okna bêdzie najlepsza i jaki wybraæ overlaping (ewentualnie jakieœ inne parametry funkcji melfcc)
 #Funckja MFCC jest w Podstawowe funkcje.R
 d1 = MFCC(u1)
 d2 = MFCC(u2)
+
+#Porówynywanie funkcj¹ GetMeanAndStd
+w1 = GetMeanAndStd(u1)
+w2 = GetMeanAndStd(u2)
 
 #Porównywanie wyników
 #RMS jest w Podstawowe funkcje.R

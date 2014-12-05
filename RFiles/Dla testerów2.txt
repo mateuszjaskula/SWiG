@@ -1,0 +1,2 @@
+Doda³em funkcje ClassifyMusicGenre. Znajdziecie j¹ w Funckje.R
+Przyjmuje sobie jakieœ argumenty i pasuje je dobraæ tak ¿eby dzia³a³a najlepiej jak siê da
